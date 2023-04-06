@@ -3,22 +3,29 @@ BINARY_NAME=server
 BINARY_PATH=$(BINARY_DIR)/$(BINARY_NAME)
 RELEASE_NAME=tinykv
 COVERAGE_PROFILE=cover.out
-DOCKER_IMAGE=tinykv
+DOCKER_IMAGE=tinykv-master
 DOCKER_IMAGE_DEV=$(DOCKER_IMAGE)-dev
 DOCKER_IMAGE_WATCH=$(DOCKER_IMAGE)-watch
-DOCKER_PORT=3000
-WATCH_PORT=3001
+WATCH_MASTER_PORT=3000
+WATCH_VOL1_PORT=3001
+WATCH_VOL2_PORT=3002
+WATCH_VOL3_PORT=3003
+WATCH_MASTER_INDEX_PATH=tmp/indexdb
+WATCH_VOL1_PATH=tmp/vol1
+WATCH_VOL2_PATH=tmp/vol2
+WATCH_VOL3_PATH=tmp/vol3
+VOLUMES=3
 
 .PHONY: vendor
 
-all: lint coverage build
+all: format lint coverage build
 
 # Build:
 setup:
 	@go mod download
 
 build:
-	@go build -o $(BINARY_PATH) ./cmd/server
+	@go build -buildvcs=false -o $(BINARY_PATH) ./cmd/server
 
 clean:
 	@go clean --cache
@@ -30,14 +37,23 @@ vendor:
 
 watch:
 	$(eval PACKAGE_NAME=$(shell head -n 1 go.mod | cut -d ' ' -f2))
+	@docker build -t $(DOCKER_IMAGE_WATCH) --target watch .
 	@docker run -it --rm \
 		-w /go/src/$(PACKAGE_NAME) \
 		-v $(shell pwd):/go/src/$(PACKAGE_NAME) \
-		-p $(WATCH_PORT):$(WATCH_PORT) \
+		-p $(WATCH_MASTER_PORT):$(WATCH_MASTER_PORT) \
+		-p $(WATCH_VOL1_PORT):$(WATCH_VOL1_PORT) \
+		-p $(WATCH_VOL2_PORT):$(WATCH_VOL2_PORT) \
+		-p $(WATCH_VOL3_PORT):$(WATCH_VOL3_PORT) \
 		--name $(DOCKER_IMAGE_WATCH) \
-		cosmtrek/air \
-		--build.cmd "go build -race -o $(BINARY_PATH) ./cmd/server" \
-		--build.bin "./$(BINARY_PATH) -p $(WATCH_PORT)"
+		$(DOCKER_IMAGE_WATCH) \
+		--build.cmd "go build -race -buildvcs=false -o $(BINARY_PATH) ./cmd/server && \
+					 ./volume/kill_all.sh && \
+					 PORT=$(WATCH_VOL1_PORT) VOLUME=$(WATCH_VOL1_PATH) ./volume/setup.sh && \
+					 PORT=$(WATCH_VOL2_PORT) VOLUME=$(WATCH_VOL2_PATH) ./volume/setup.sh && \
+					 PORT=$(WATCH_VOL3_PORT) VOLUME=$(WATCH_VOL3_PATH) ./volume/setup.sh && \
+					 rm -r $(WATCH_MASTER_INDEX_PATH) || true" \
+		--build.bin "./$(BINARY_PATH) --db $(WATCH_MASTER_INDEX_PATH) --port $(WATCH_MASTER_PORT) --volumes localhost:$(WATCH_VOL1_PORT),localhost:$(WATCH_VOL2_PORT),localhost:$(WATCH_VOL3_PORT)"
 
 # Test:
 test:
@@ -51,14 +67,18 @@ coverage:
 bench:
 	@go test -bench=. -run=^a -benchtime=5x ./...
 
+# Format
+format:
+	@gofmt -s -w .
+
 # Lint
 lint:
-	@golangci-lint run --timeout=3m
+	@golangci-lint run
 
 # Release:
 release:
-	@go build -o $(BINARY_NAME) ./cmd/server
-	@tar -czvf $(RELEASE_NAME).tar.gz $(BINARY_NAME) README.md LICENSE.md
+	@go build -buildvcs=false -o $(BINARY_NAME) ./cmd/server
+	@tar -czvf $(RELEASE_NAME).tar.gz $(BINARY_NAME) volume README.md LICENSE
 	@rm $(BINARY_NAME)
 
 # Docker dev:
@@ -77,13 +97,3 @@ docker-test:
 
 docker-bench:
 	@docker exec $(DOCKER_IMAGE_DEV) make bench
-
-# Docker prod:
-docker-build:
-	@docker build -t $(DOCKER_IMAGE) --target release .
-
-docker-run:
-	@docker run --rm --name $(DOCKER_IMAGE) -d -p $(DOCKER_PORT):$(DOCKER_PORT) $(DOCKER_IMAGE) -p $(DOCKER_PORT)
-
-docker-stop:
-	@docker stop $(DOCKER_IMAGE)

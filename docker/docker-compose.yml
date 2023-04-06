@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  master:
+    build:
+      context: ..
+      target: master
+    command: ["--volumes", "${VOLUMES:-''}"]
+    volumes:
+      - master_data:/app/indexdb/
+    ports:
+      - "3000:3000"
+    networks:
+      tinykv_net:
+
+  volume:
+    build:
+      context: ..
+      target: volume
+    environment:
+      VOLUME: "/volume/${{.Node.ID}}"
+    volumes:
+        - volume_data:/volume/
+    ports:
+      - "80"
+    networks:
+      tinykv_net:
+
+volumes:
+  master_data:
+    name: "tinykv-master"
+  volume_data:
+    name: "tinykv-volume"
+
+networks:
+  tinykv_net:
+    name: "tinykv-network"
