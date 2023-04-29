@@ -14,7 +14,7 @@ func KeyToPath(key []byte) string {
 }
 
 func KeyToVolume(key []byte, volumes []string) string {
-	var selectedVolume string
+	var selected string
 	var bestScore []byte
 
 	for _, volume := range volumes {
@@ -24,8 +24,9 @@ func KeyToVolume(key []byte, volumes []string) string {
 		score := hash.Sum(nil)
 		if bestScore == nil || bytes.Compare(bestScore, score) == -1 {
 			bestScore = score
-			selectedVolume = volume
+			selected = volume
 		}
 	}
-	return selectedVolume
+
+	return selected
 }

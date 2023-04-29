@@ -5,8 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/micpst/tinykv/pkg/hash"
-	"github.com/micpst/tinykv/pkg/rpc"
+	"github.com/micpst/tinykv/pkg/syncset"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -18,6 +17,7 @@ type Config struct {
 
 type Server struct {
 	db      *leveldb.DB
+	locks   *syncset.SyncSet
 	port    int
 	volumes []string
 }
@@ -29,6 +29,7 @@ func New(cfg *Config) (*Server, error) {
 	}
 	return &Server{
 		db:      db,
+		locks:   syncset.New(),
 		port:    cfg.Port,
 		volumes: cfg.Volumes,
 	}, nil
@@ -40,74 +41,20 @@ func (s *Server) Run() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	key := []byte(r.URL.Path)
+	if r.Method == http.MethodPut || r.Method == http.MethodDelete {
+		if ok := s.locks.Add(r.URL.Path); !ok {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		defer s.locks.Remove(r.URL.Path)
+	}
 
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
-		data, err := s.db.Get(key, nil)
-		if err == leveldb.ErrNotFound {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		remote := fmt.Sprintf("http://%s%s", string(data), hash.KeyToPath(key))
-		w.Header().Set("Location", remote)
-		w.WriteHeader(http.StatusFound)
-
+		s.fetchData(w, r)
 	case http.MethodPut:
-		// no empty values
-		if r.ContentLength == 0 {
-			w.WriteHeader(http.StatusLengthRequired)
-			return
-		}
-
-		// check if we already have the key
-		if _, err := s.db.Get(key, nil); err != leveldb.ErrNotFound {
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-
-		// we don't, compute the remote URL
-		volume := hash.KeyToVolume(key, s.volumes)
-		remote := fmt.Sprintf("http://%s%s", volume, hash.KeyToPath(key))
-
-		if !rpc.Put(remote, r.ContentLength, r.Body) {
-			rpc.Delete(remote)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// note, this currently is a race
-		// TODO: put get and put in the same transaction
-		if _, err := s.db.Get(key, nil); err != leveldb.ErrNotFound {
-			rpc.Delete(remote)
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-
-		// push to leveldb
-		err := s.db.Put(key, []byte(volume), nil)
-		if err != nil {
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-
+		s.putData(w, r)
 	case http.MethodDelete:
-		// delete the key
-		data, err := s.db.Get(key, nil)
-		if err == leveldb.ErrNotFound {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		_ = s.db.Delete(key, nil)
-
-		remote := fmt.Sprintf("http://%s%s", string(data), hash.KeyToPath(key))
-		if !rpc.Delete(remote) {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
+		s.deleteData(w, r)
 	}
 }
