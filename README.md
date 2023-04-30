@@ -32,13 +32,20 @@ Put `"bigswag"` in `"wehave"` key:
 ```bash
 $ curl -L -X PUT -d bigswag localhost:3000/wehave
 ```
+
 Get `"wehave"` key:
 ```bash
 $ curl -L localhost:3000/wehave
 ```
+
 Delete `"wehave"` key:
 ```bash
 $ curl -L -X DELETE localhost:3000/wehave
+```
+
+List keys starting with `"we"`:
+```bash
+$ curl -L localhost:3000/we?list
 ```
 
 ## 🕜 Performance

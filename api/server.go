@@ -41,7 +41,16 @@ func (s *Server) Run() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPut || r.Method == http.MethodDelete {
+	if len(r.URL.RawQuery) > 0 && r.Method == http.MethodGet {
+		s.dispatchQuery(w, r)
+	} else {
+		s.dispatchMethod(w, r)
+	}
+}
+
+func (s *Server) dispatchMethod(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPut, http.MethodDelete:
 		if ok := s.locks.Add(r.URL.Path); !ok {
 			w.WriteHeader(http.StatusConflict)
 			return
@@ -56,5 +65,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.putData(w, r)
 	case http.MethodDelete:
 		s.deleteData(w, r)
+	}
+}
+
+func (s *Server) dispatchQuery(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.RawQuery {
+	case "list":
+		s.listData(w, r)
+	default:
+		w.WriteHeader(http.StatusForbidden)
 	}
 }

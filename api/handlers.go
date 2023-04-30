@@ -1,12 +1,14 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/micpst/tinykv/pkg/hash"
 	"github.com/micpst/tinykv/pkg/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 func (s *Server) fetchData(w http.ResponseWriter, r *http.Request) {
@@ -74,4 +76,30 @@ func (s *Server) deleteData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listData(w http.ResponseWriter, r *http.Request) {
+	key := []byte(r.URL.Path)
+
+	iter := s.db.NewIterator(util.BytesPrefix(key), nil)
+	defer iter.Release()
+
+	keys := make([]string, 0)
+	for iter.Next() {
+		keys = append(keys, string(iter.Key()))
+		if len(keys) > 1000000 {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+	}
+
+	str, err := json.Marshal(keys)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(str)
 }
