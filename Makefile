@@ -1,5 +1,5 @@
 BINARY_DIR=bin
-BINARY_NAME=server
+BINARY_NAME=master
 BINARY_PATH=$(BINARY_DIR)/$(BINARY_NAME)
 RELEASE_NAME=tinykv
 COVERAGE_PROFILE=cover.out
@@ -25,7 +25,7 @@ setup:
 	@go mod download
 
 build:
-	@go build -buildvcs=false -o $(BINARY_PATH) ./cmd/server
+	@go build -buildvcs=false -o $(BINARY_PATH) ./cmd/master
 
 clean:
 	@go clean --cache
@@ -47,12 +47,12 @@ watch:
 		-p $(WATCH_VOL3_PORT):$(WATCH_VOL3_PORT) \
 		--name $(DOCKER_IMAGE_WATCH) \
 		$(DOCKER_IMAGE_WATCH) \
-		--build.cmd "go build -race -buildvcs=false -o $(BINARY_PATH) ./cmd/server && \
+		--build.cmd "go build -race -buildvcs=false -o $(BINARY_PATH) ./cmd/master && \
 					 ./volume/kill_all.sh && \
+					 rm -r tmp || true && \
 					 PORT=$(WATCH_VOL1_PORT) VOLUME=$(WATCH_VOL1_PATH) ./volume/setup.sh && \
 					 PORT=$(WATCH_VOL2_PORT) VOLUME=$(WATCH_VOL2_PATH) ./volume/setup.sh && \
-					 PORT=$(WATCH_VOL3_PORT) VOLUME=$(WATCH_VOL3_PATH) ./volume/setup.sh && \
-					 rm -r $(WATCH_MASTER_INDEX_PATH) || true" \
+					 PORT=$(WATCH_VOL3_PORT) VOLUME=$(WATCH_VOL3_PATH) ./volume/setup.sh" \
 		--build.bin "./$(BINARY_PATH) --db $(WATCH_MASTER_INDEX_PATH) --port $(WATCH_MASTER_PORT) --volumes localhost:$(WATCH_VOL1_PORT),localhost:$(WATCH_VOL2_PORT),localhost:$(WATCH_VOL3_PORT)"
 
 # Test:
@@ -77,7 +77,7 @@ lint:
 
 # Release:
 release:
-	@go build -buildvcs=false -o $(BINARY_NAME) ./cmd/server
+	@go build -buildvcs=false -o $(BINARY_NAME) ./cmd/master
 	@tar -czvf $(RELEASE_NAME).tar.gz $(BINARY_NAME) volume README.md LICENSE
 	@rm $(BINARY_NAME)
 

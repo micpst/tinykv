@@ -22,12 +22,13 @@ $ PORT=3001 VOLUME=tmp/vol1 ./volume/setup.sh
 $ PORT=3002 VOLUME=tmp/vol2 ./volume/setup.sh
 $ PORT=3003 VOLUME=tmp/vol3 ./volume/setup.sh
 ```
-5. Run the server binary:
+5. Run the master server binary:
 ```bash
-$ ./bin/server
+$ ./bin/master --db ./tmp/indexdb/ --port 3000 --volumes localhost:3001,localhost:3002,localhost:3003
 ```
 
 ## 📘 Usage
+### Master API
 Put `"bigswag"` in `"wehave"` key:
 ```bash
 $ curl -L -X PUT -d bigswag localhost:3000/wehave
@@ -47,6 +48,13 @@ List keys starting with `"we"`:
 ```bash
 $ curl -L localhost:3000/we?list
 ```
+
+### Rebalancing the index
+Change the amount of volume servers:
+```bash
+$ ./bin/master --cmd rebalance --db ./tmp/indexdb/ --volumes localhost:3001,localhost:3002
+```
+> Before rebalancing, make sure the master server is down, as LevelDB can only be accessed by one process.
 
 ## 🕜 Performance
 Fetching non-existent key: ~10325 req/sec
