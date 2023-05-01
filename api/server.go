@@ -83,12 +83,12 @@ func (s *Server) Rebalance() {
 	log.Println("Rebalancing to", s.volumes)
 
 	var wg sync.WaitGroup
-	reqs := make(chan rebalanceRequest, 20000)
+	requests := make(chan *rebalanceRequest, 20000)
 
 	for i := 0; i < 16; i++ {
 		go func() {
-			for req := range reqs {
-				s.rebalance(req)
+			for r := range requests {
+				s.rebalance(r)
 				wg.Done()
 			}
 		}()
@@ -106,13 +106,13 @@ func (s *Server) Rebalance() {
 		oldVolume := string(iter.Value())
 		newVolume := hash.KeyToVolume(key, s.volumes)
 
-		reqs <- rebalanceRequest{
+		requests <- &rebalanceRequest{
 			key:  key,
 			from: oldVolume,
 			to:   newVolume,
 		}
 	}
 
-	close(reqs)
+	close(requests)
 	wg.Wait()
 }
