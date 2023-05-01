@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
+	"github.com/micpst/tinykv/pkg/hash"
 	"github.com/micpst/tinykv/pkg/syncset"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -33,11 +35,6 @@ func New(cfg *Config) (*Server, error) {
 		port:    cfg.Port,
 		volumes: cfg.Volumes,
 	}, nil
-}
-
-func (s *Server) Run() {
-	log.Println("Staring master server on port", s.port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -71,8 +68,51 @@ func (s *Server) dispatchMethod(w http.ResponseWriter, r *http.Request) {
 func (s *Server) dispatchQuery(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.RawQuery {
 	case "list":
-		s.listData(w, r)
+		s.listKeys(w, r)
 	default:
 		w.WriteHeader(http.StatusForbidden)
 	}
+}
+
+func (s *Server) Run() {
+	log.Println("Staring master server on port", s.port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s))
+}
+
+func (s *Server) Rebalance() {
+	log.Println("Rebalancing to", s.volumes)
+
+	var wg sync.WaitGroup
+	requests := make(chan *rebalanceRequest, 20000)
+
+	for i := 0; i < 16; i++ {
+		go func() {
+			for r := range requests {
+				s.rebalance(r)
+				wg.Done()
+			}
+		}()
+	}
+
+	iter := s.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		wg.Add(1)
+
+		key := make([]byte, len(iter.Key()))
+		copy(key, iter.Key())
+
+		oldVolume := string(iter.Value())
+		newVolume := hash.KeyToVolume(key, s.volumes)
+
+		requests <- &rebalanceRequest{
+			key:  key,
+			from: oldVolume,
+			to:   newVolume,
+		}
+	}
+
+	close(requests)
+	wg.Wait()
 }

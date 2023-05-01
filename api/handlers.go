@@ -45,7 +45,7 @@ func (s *Server) putData(w http.ResponseWriter, r *http.Request) {
 	volume := hash.KeyToVolume(key, s.volumes)
 	remote := fmt.Sprintf("http://%s%s", volume, hash.KeyToPath(key))
 
-	if !rpc.Put(remote, r.ContentLength, r.Body) {
+	if err := rpc.Put(remote, r.ContentLength, r.Body); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -70,7 +70,7 @@ func (s *Server) deleteData(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.Delete(key, nil)
 
 	remote := fmt.Sprintf("http://%s%s", string(data), hash.KeyToPath(key))
-	if !rpc.Delete(remote) {
+	if err := rpc.Delete(remote); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +78,7 @@ func (s *Server) deleteData(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) listData(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listKeys(w http.ResponseWriter, r *http.Request) {
 	key := []byte(r.URL.Path)
 
 	iter := s.db.NewIterator(util.BytesPrefix(key), nil)

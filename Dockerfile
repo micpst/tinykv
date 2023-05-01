@@ -34,7 +34,7 @@ COPY pkg ./pkg
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o ./bin/server ./cmd/server
+    go build -o ./bin/master ./cmd/master
 
 # --- Master release image ---
 FROM gcr.io/distroless/base-debian11:debug AS master
@@ -46,13 +46,13 @@ SHELL ["/busybox/sh", "-c"]
 RUN mkdir indexdb && \
     chown -R nonroot:nonroot indexdb
 
-COPY --from=build /app/bin/server .
+COPY --from=build /app/bin/master .
 
 USER nonroot:nonroot
 
 EXPOSE 3000
 
-ENTRYPOINT ["./server", "--db", "indexdb", "--port", "3000"]
+ENTRYPOINT ["./master", "--db", "indexdb", "--port", "3000"]
 
 CMD ["--volumes", ""]
 
