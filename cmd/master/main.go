@@ -10,6 +10,7 @@ import (
 
 const (
 	RebalanceCmd = "rebalance"
+	RebuildCmd = "rebuild"
 	RunCmd       = "run"
 )
 
@@ -30,10 +31,12 @@ func main() {
 	}
 
 	switch *cmd {
-	case RunCmd:
-		s.Run()
 	case RebalanceCmd:
 		s.Rebalance()
+	case RebuildCmd:
+		s.Rebuild()
+	case RunCmd:
+		s.Run()
 	default:
 		fmt.Println("Unknown command", *cmd)
 		flag.PrintDefaults()

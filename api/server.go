@@ -83,7 +83,7 @@ func (s *Server) Rebalance() {
 	log.Println("Rebalancing to", s.volumes)
 
 	var wg sync.WaitGroup
-	requests := make(chan *rebalanceRequest, 20000)
+	requests := make(chan *RebalanceRequest, 20000)
 
 	for i := 0; i < 16; i++ {
 		go func() {
@@ -106,10 +106,42 @@ func (s *Server) Rebalance() {
 		oldVolume := string(iter.Value())
 		newVolume := hash.KeyToVolume(key, s.volumes)
 
-		requests <- &rebalanceRequest{
-			key:  key,
-			from: oldVolume,
-			to:   newVolume,
+		requests <- &RebalanceRequest{
+			Key:  key,
+			From: oldVolume,
+			To:   newVolume,
+		}
+	}
+
+	close(requests)
+	wg.Wait()
+}
+
+func (s *Server) Rebuild() {
+	fmt.Println("Rebuilding on", s.volumes)
+
+	var wg sync.WaitGroup
+	requests := make(chan *RebuildRequest, 20000)
+
+	for i := 0; i < 64; i++ {
+		go func() {
+			for r := range requests {
+				s.rebuild(r)
+				wg.Done()
+			}
+		}()
+	}
+
+	for i := 0; i < 256; i++ {
+		for j := 0; j < 256; j++ {
+			for _, volume := range s.volumes {
+				wg.Add(1)
+				url := fmt.Sprintf("http://%s/%02x/%02x/", volume, i, j)
+				requests <- &RebuildRequest{
+					Volume: volume,
+					Url: url,
+				}
+			}
 		}
 	}
 

@@ -49,12 +49,18 @@ List keys starting with `"we"`:
 $ curl -L localhost:3000/we?list
 ```
 
-### Rebalancing the index
+### Rebalancing volumes
 Change the amount of volume servers:
 ```bash
 $ ./bin/master --cmd rebalance --db ./tmp/indexdb/ --volumes localhost:3001,localhost:3002
 ```
 > Before rebalancing, make sure the master server is down, as LevelDB can only be accessed by one process.
+
+### Rebuilding the index
+Regenerate the LevelDB:
+```bash
+$ ./bin/master --cmd rebuild --db ./tmp/indexdb-alt/ --volumes localhost:3001,localhost:3002,localhost:3003
+```
 
 ## 🕜 Performance
 Fetching non-existent key: ~10325 req/sec
