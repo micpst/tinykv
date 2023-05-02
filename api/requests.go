@@ -18,12 +18,12 @@ type RebalanceRequest struct {
 
 type RebuildRequest struct {
 	Volume string
-	Url string
+	Url    string
 }
 
 type File struct {
-	Name string
-	Type string
+	Name  string
+	Type  string
 	Mtime string
 }
 

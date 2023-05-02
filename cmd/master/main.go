@@ -10,7 +10,7 @@ import (
 
 const (
 	RebalanceCmd = "rebalance"
-	RebuildCmd = "rebuild"
+	RebuildCmd   = "rebuild"
 	RunCmd       = "run"
 )
 

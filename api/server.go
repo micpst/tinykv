@@ -139,7 +139,7 @@ func (s *Server) Rebuild() {
 				url := fmt.Sprintf("http://%s/%02x/%02x/", volume, i, j)
 				requests <- &RebuildRequest{
 					Volume: volume,
-					Url: url,
+					Url:    url,
 				}
 			}
 		}
