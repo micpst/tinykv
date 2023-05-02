@@ -15,7 +15,7 @@ const (
 )
 
 func main() {
-	cmd := flag.String("cmd", RunCmd, "Master command to execute: \"run\" or \"rebalance\"")
+	cmd := flag.String("cmd", RunCmd, "Master command to execute: \"run\", \"rebalance\" or \"rebuild\"")
 	db := flag.String("db", "", "Path to leveldb")
 	port := flag.Int("port", 3000, "Port for the server to listen on")
 	volumes := flag.String("volumes", "", "Volumes to use for storage (comma separated)")
