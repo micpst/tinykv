@@ -46,7 +46,9 @@ $ curl -L -X DELETE localhost:3000/wehave
 
 List keys starting with `"we"`:
 ```bash
-$ curl -L localhost:3000/we?list
+$ curl -L "localhost:3000/we?list"
+$ curl -L "localhost:3000/we?list&limit=100"
+$ curl -L "localhost:3000?list&start=/we&limit=100"
 ```
 
 ### Rebalance volumes
