@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/micpst/tinykv/pkg/hash"
@@ -66,7 +67,8 @@ func (s *Server) dispatchMethod(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) dispatchQuery(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.RawQuery {
+	operation := strings.Split(r.URL.RawQuery, "&")[0]
+	switch operation {
 	case "list":
 		s.listKeys(w, r)
 	default:

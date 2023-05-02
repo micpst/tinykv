@@ -4,12 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/micpst/tinykv/pkg/hash"
 	"github.com/micpst/tinykv/pkg/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
+
+type ListResponse struct {
+	Next string `json:"next"`
+	Keys []string `json:"keys"`
+}
 
 func (s *Server) fetchData(w http.ResponseWriter, r *http.Request) {
 	key := []byte(r.URL.Path)
@@ -80,20 +86,42 @@ func (s *Server) deleteData(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listKeys(w http.ResponseWriter, r *http.Request) {
 	key := []byte(r.URL.Path)
+	slice := util.BytesPrefix(key)
+	if start := r.URL.Query().Get("start"); start != "" {
+		slice.Start = []byte(start)
+	}
 
-	iter := s.db.NewIterator(util.BytesPrefix(key), nil)
+	limit := 10
+	if qLimit := r.URL.Query().Get("limit"); qLimit != "" {
+		parsed, err := strconv.Atoi(qLimit)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		limit = parsed
+	}
+
+	data := ListResponse{
+		Next: "",
+		Keys: make([]string, 0),
+	}
+
+	iter := s.db.NewIterator(slice, nil)
 	defer iter.Release()
 
-	keys := make([]string, 0)
 	for iter.Next() {
-		keys = append(keys, string(iter.Key()))
-		if len(keys) > 1000000 {
+		if len(data.Keys) > 1000000 {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
+		if len(data.Keys) == limit {
+			data.Next = string(iter.Key())
+			break
+		}
+		data.Keys = append(data.Keys, string(iter.Key()))
 	}
 
-	str, err := json.Marshal(keys)
+	response, err := json.Marshal(data)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -101,5 +129,5 @@ func (s *Server) listKeys(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(str)
+	_, _ = w.Write(response)
 }
