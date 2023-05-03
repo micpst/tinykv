@@ -13,16 +13,18 @@ import (
 )
 
 type Config struct {
-	Db      string
-	Port    int
-	Volumes []string
+	Db       string
+	Port     int
+	Replicas int
+	Volumes  []string
 }
 
 type Server struct {
-	db      *leveldb.DB
-	locks   *syncset.SyncSet
-	port    int
-	volumes []string
+	db       *leveldb.DB
+	locks    *syncset.SyncSet
+	port     int
+	replicas int
+	volumes  []string
 }
 
 func New(cfg *Config) (*Server, error) {
@@ -31,10 +33,11 @@ func New(cfg *Config) (*Server, error) {
 		return nil, fmt.Errorf("LevelDB open failed %s", err)
 	}
 	return &Server{
-		db:      db,
-		locks:   syncset.New(),
-		port:    cfg.Port,
-		volumes: cfg.Volumes,
+		db:       db,
+		locks:    syncset.New(),
+		port:     cfg.Port,
+		replicas: cfg.Replicas,
+		volumes:  cfg.Volumes,
 	}, nil
 }
 
@@ -105,13 +108,13 @@ func (s *Server) Rebalance() {
 		key := make([]byte, len(iter.Key()))
 		copy(key, iter.Key())
 
-		oldVolume := string(iter.Value())
-		newVolume := hash.KeyToVolume(key, s.volumes)
+		oldVolumes := strings.Split(string(iter.Value()), ",")
+		newVolumes := hash.KeyToVolumes(key, s.volumes, s.replicas)
 
 		requests <- &RebalanceRequest{
 			Key:  key,
-			From: oldVolume,
-			To:   newVolume,
+			From: oldVolumes,
+			To:   newVolumes,
 		}
 	}
 
