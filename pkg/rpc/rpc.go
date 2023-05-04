@@ -56,7 +56,7 @@ func Head(remote string) error {
 		return err
 	}
 
-	if response.StatusCode != http.StatusNoContent {
+	if response.StatusCode != http.StatusOK {
 		return &RequestError{
 			Method:     http.MethodHead,
 			StatusCode: response.StatusCode,

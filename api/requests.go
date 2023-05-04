@@ -1,13 +1,13 @@
 package api
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/micpst/tinykv/pkg/hash"
 	"github.com/micpst/tinykv/pkg/rpc"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type RebalanceRequest struct {
@@ -17,8 +17,8 @@ type RebalanceRequest struct {
 }
 
 type RebuildRequest struct {
+	Key    []byte
 	Volume string
-	Url    string
 }
 
 type File struct {
@@ -27,15 +27,15 @@ type File struct {
 	Mtime string
 }
 
-func commonVolumes(oldVolumes []string, newVolumes []string) map[string]struct{} {
+func commonVolumes(v1 []string, v2 []string) map[string]struct{} {
 	common := make(map[string]struct{})
-	set := make(map[string]struct{}, len(oldVolumes))
+	set := make(map[string]struct{}, len(v1))
 
-	for _, v := range oldVolumes {
+	for _, v := range v1 {
 		set[v] = struct{}{}
 	}
 
-	for _, v := range newVolumes {
+	for _, v := range v2 {
 		if _, ok := set[v]; ok {
 			common[v] = struct{}{}
 		}
@@ -92,29 +92,39 @@ func (s *Server) rebalance(r *RebalanceRequest) bool {
 	return true
 }
 
-func (s *Server) rebuild(r *RebuildRequest) bool {
-	data, err := rpc.Get(r.Url)
-	if err != nil {
-		return false
-	}
-
+func fetchFiles(url string) []File {
 	var files []File
+
+	data, err := rpc.Get(url)
+	if err != nil {
+		return files
+	}
+
 	if err := json.Unmarshal([]byte(data), &files); err != nil {
+		return nil
+	}
+
+	return files
+}
+
+func (s *Server) rebuild(r *RebuildRequest) bool {
+	if ok := s.locks.Add(string(r.Key)); !ok {
+		return false
+	}
+	defer s.locks.Remove(string(r.Key))
+
+	volumes := []string{r.Volume}
+
+	data, err := s.db.Get(r.Key, nil)
+	if err != leveldb.ErrNotFound {
+		volumes = append(volumes, strings.Split(string(data), ",")...)
+	}
+
+	if err := s.db.Put(r.Key, []byte(strings.Join(volumes, ",")), nil); err != nil {
 		return false
 	}
 
-	for _, file := range files {
-		key, err := base64.StdEncoding.DecodeString(file.Name)
-		if err != nil {
-			return false
-		}
-
-		if err := s.db.Put(key, []byte(r.Volume), nil); err != nil {
-			return false
-		}
-
-		fmt.Println(string(key), r.Volume)
-	}
+	fmt.Println(string(r.Key), r.Volume)
 
 	return true
 }

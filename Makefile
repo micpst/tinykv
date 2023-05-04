@@ -97,3 +97,11 @@ docker-test:
 
 docker-bench:
 	@docker exec $(DOCKER_IMAGE_DEV) make bench
+
+docker-up-volume:
+	@docker compose -p tinykv -f docker/docker-compose.yml up -d --scale volume=3 volume
+
+docker-up-master:
+	@docker compose -p tinykv -f docker/docker-compose.yml up -d master
+
+docker-up: docker-up-volume docker-up-master

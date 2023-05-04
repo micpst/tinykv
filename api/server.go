@@ -41,44 +41,6 @@ func New(cfg *Config) (*Server, error) {
 	}, nil
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if len(r.URL.RawQuery) > 0 && r.Method == http.MethodGet {
-		s.dispatchQuery(w, r)
-	} else {
-		s.dispatchMethod(w, r)
-	}
-}
-
-func (s *Server) dispatchMethod(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPut, http.MethodDelete:
-		if ok := s.locks.Add(r.URL.Path); !ok {
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-		defer s.locks.Remove(r.URL.Path)
-	}
-
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-		s.fetchData(w, r)
-	case http.MethodPut:
-		s.putData(w, r)
-	case http.MethodDelete:
-		s.deleteData(w, r)
-	}
-}
-
-func (s *Server) dispatchQuery(w http.ResponseWriter, r *http.Request) {
-	operation := strings.Split(r.URL.RawQuery, "&")[0]
-	switch operation {
-	case "list":
-		s.listKeys(w, r)
-	default:
-		w.WriteHeader(http.StatusForbidden)
-	}
-}
-
 func (s *Server) Run() {
 	log.Println("Staring master server on port", s.port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s))
@@ -128,7 +90,7 @@ func (s *Server) Rebuild() {
 	var wg sync.WaitGroup
 	requests := make(chan *RebuildRequest, 20000)
 
-	for i := 0; i < 64; i++ {
+	for i := 0; i < 128; i++ {
 		go func() {
 			for r := range requests {
 				s.rebuild(r)
@@ -137,14 +99,29 @@ func (s *Server) Rebuild() {
 		}()
 	}
 
-	for i := 0; i < 256; i++ {
-		for j := 0; j < 256; j++ {
-			for _, volume := range s.volumes {
-				wg.Add(1)
-				url := fmt.Sprintf("http://%s/%02x/%02x/", volume, i, j)
-				requests <- &RebuildRequest{
-					Volume: volume,
-					Url:    url,
+	iter := s.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		_ = s.db.Delete(iter.Key(), nil)
+	}
+
+	for _, volume := range s.volumes {
+		stack := []string{""}
+
+		for len(stack) > 0 {
+			dir := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			files := fetchFiles(fmt.Sprintf("http://%s/%s", volume, dir))
+			for _, file := range files {
+				if file.Type == "directory" {
+					stack = append(stack, fmt.Sprintf("%s/%s", dir, file.Name))
+				} else {
+					requests <- &RebuildRequest{
+						Key:    []byte(file.Name),
+						Volume: volume,
+					}
 				}
 			}
 		}

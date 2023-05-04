@@ -17,8 +17,8 @@ services:
     build:
       context: ..
       target: volume
-    environment:
-      VOLUME: "/volume/${{.Node.ID}}"
+#    environment:
+#      VOLUME: "/volume/${{.Node.ID}}"
     volumes:
         - volume_data:/volume/
     ports:

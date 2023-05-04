@@ -52,9 +52,9 @@ USER nonroot:nonroot
 
 EXPOSE 3000
 
-ENTRYPOINT ["./master", "--db", "indexdb", "--port", "3000"]
+ENTRYPOINT ["./master"]
 
-CMD ["--volumes", ""]
+CMD ["-cmd", "run", "-db", "indexdb", "-p", "3000", "-vols", ""]
 
 # --- Volume node release image ---
 FROM nginx:1.23 AS volume
