@@ -62,8 +62,8 @@ jobs:
           asset_path: ./tinykv.tar.gz
           asset_content_type: application/gzip
 
-  push_image:
-    name: Publish Docker image
+  push_master_image:
+    name: Publish Master Docker image
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -73,7 +73,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}
+          images: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}-master
           tags: type=semver,pattern={{version}}
 
       - name: Log in to Docker Hub
@@ -86,7 +86,36 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          target: release
+          target: master
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  push_volume_image:
+    name: Publish Volume Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}-volume
+          tags: type=semver,pattern={{version}}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          target: volume
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
