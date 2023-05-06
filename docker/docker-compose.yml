@@ -5,7 +5,9 @@ services:
     build:
       context: ..
       target: master
-    command: ["--volumes", "${VOLUMES:-''}"]
+    environment:
+      REPLICAS: ${REPLICAS:-3}
+      VOLUMES: ${VOLUMES:-''}
     volumes:
       - master_data:/app/indexdb/
     ports:
@@ -17,10 +19,8 @@ services:
     build:
       context: ..
       target: volume
-    environment:
-      VOLUME: "/volume/${{.Node.ID}}"
     volumes:
-        - volume_data:/volume/
+      - volume_data:/app/
     ports:
       - "80"
     networks:

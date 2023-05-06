@@ -13,16 +13,18 @@ import (
 )
 
 type Config struct {
-	Db      string
-	Port    int
-	Volumes []string
+	Db       string
+	Port     int
+	Replicas int
+	Volumes  []string
 }
 
 type Server struct {
-	db      *leveldb.DB
-	locks   *syncset.SyncSet
-	port    int
-	volumes []string
+	db       *leveldb.DB
+	locks    *syncset.SyncSet
+	port     int
+	replicas int
+	volumes  []string
 }
 
 func New(cfg *Config) (*Server, error) {
@@ -31,49 +33,12 @@ func New(cfg *Config) (*Server, error) {
 		return nil, fmt.Errorf("LevelDB open failed %s", err)
 	}
 	return &Server{
-		db:      db,
-		locks:   syncset.New(),
-		port:    cfg.Port,
-		volumes: cfg.Volumes,
+		db:       db,
+		locks:    syncset.New(),
+		port:     cfg.Port,
+		replicas: cfg.Replicas,
+		volumes:  cfg.Volumes,
 	}, nil
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if len(r.URL.RawQuery) > 0 && r.Method == http.MethodGet {
-		s.dispatchQuery(w, r)
-	} else {
-		s.dispatchMethod(w, r)
-	}
-}
-
-func (s *Server) dispatchMethod(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPut, http.MethodDelete:
-		if ok := s.locks.Add(r.URL.Path); !ok {
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-		defer s.locks.Remove(r.URL.Path)
-	}
-
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-		s.fetchData(w, r)
-	case http.MethodPut:
-		s.putData(w, r)
-	case http.MethodDelete:
-		s.deleteData(w, r)
-	}
-}
-
-func (s *Server) dispatchQuery(w http.ResponseWriter, r *http.Request) {
-	operation := strings.Split(r.URL.RawQuery, "&")[0]
-	switch operation {
-	case "list":
-		s.listKeys(w, r)
-	default:
-		w.WriteHeader(http.StatusForbidden)
-	}
 }
 
 func (s *Server) Run() {
@@ -105,13 +70,13 @@ func (s *Server) Rebalance() {
 		key := make([]byte, len(iter.Key()))
 		copy(key, iter.Key())
 
-		oldVolume := string(iter.Value())
-		newVolume := hash.KeyToVolume(key, s.volumes)
+		oldVolumes := strings.Split(string(iter.Value()), ",")
+		newVolumes := hash.KeyToVolumes(key, s.volumes, s.replicas)
 
 		requests <- &RebalanceRequest{
 			Key:  key,
-			From: oldVolume,
-			To:   newVolume,
+			From: oldVolumes,
+			To:   newVolumes,
 		}
 	}
 
@@ -120,12 +85,12 @@ func (s *Server) Rebalance() {
 }
 
 func (s *Server) Rebuild() {
-	fmt.Println("Rebuilding on", s.volumes)
+	log.Println("Rebuilding on", s.volumes)
 
 	var wg sync.WaitGroup
 	requests := make(chan *RebuildRequest, 20000)
 
-	for i := 0; i < 64; i++ {
+	for i := 0; i < 128; i++ {
 		go func() {
 			for r := range requests {
 				s.rebuild(r)
@@ -134,14 +99,29 @@ func (s *Server) Rebuild() {
 		}()
 	}
 
-	for i := 0; i < 256; i++ {
-		for j := 0; j < 256; j++ {
-			for _, volume := range s.volumes {
-				wg.Add(1)
-				url := fmt.Sprintf("http://%s/%02x/%02x/", volume, i, j)
-				requests <- &RebuildRequest{
-					Volume: volume,
-					Url:    url,
+	iter := s.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		_ = s.db.Delete(iter.Key(), nil)
+	}
+
+	for _, volume := range s.volumes {
+		stack := []string{""}
+
+		for len(stack) > 0 {
+			dir := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			files := fetchFiles(fmt.Sprintf("http://%s/%s", volume, dir))
+			for _, file := range files {
+				if file.Type == "directory" {
+					stack = append(stack, fmt.Sprintf("%s/%s", dir, file.Name))
+				} else {
+					requests <- &RebuildRequest{
+						Key:    []byte(file.Name),
+						Volume: volume,
+					}
 				}
 			}
 		}
