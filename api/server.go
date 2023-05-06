@@ -85,7 +85,7 @@ func (s *Server) Rebalance() {
 }
 
 func (s *Server) Rebuild() {
-	fmt.Println("Rebuilding on", s.volumes)
+	log.Println("Rebuilding on", s.volumes)
 
 	var wg sync.WaitGroup
 	requests := make(chan *RebuildRequest, 20000)

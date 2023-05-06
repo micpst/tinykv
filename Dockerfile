@@ -41,26 +41,30 @@ FROM gcr.io/distroless/base-debian11:debug AS master
 
 WORKDIR /app
 
+COPY docker/docker-entrypoint.sh .
+COPY --from=build /app/bin/master .
+
 SHELL ["/busybox/sh", "-c"]
 
 RUN mkdir indexdb && \
-    chown -R nonroot:nonroot indexdb
+    chown -R nonroot:nonroot indexdb && \
+    chmod +x docker-entrypoint.sh
 
-COPY --from=build /app/bin/master .
-
-USER nonroot:nonroot
+ENV VOLUMES=""
 
 EXPOSE 3000
 
-ENTRYPOINT ["./master"]
+USER nonroot:nonroot
 
-CMD ["-cmd", "run", "-db", "indexdb", "-p", "3000", "-vols", ""]
+ENTRYPOINT ["./docker-entrypoint.sh"]
 
 # --- Volume node release image ---
 FROM nginx:1.23 AS volume
 
-COPY volume/setup.sh .
+WORKDIR /app
 
-RUN chmod +x setup.sh
+COPY volume/setup.sh /
 
-CMD ["./setup.sh", "-g", "daemon off;"]
+RUN chmod +x /setup.sh
+
+CMD ["sh", "-c", "VOLUME=$(hostname) /setup.sh -g 'daemon off;'"]

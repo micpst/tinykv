@@ -5,6 +5,16 @@
 Distributed key-value store written in Go.
 
 ## 🛠️ Installation
+### Run with Docker
+To run tinykv with Docker on a single host:
+```bash
+$ make docker-up HOST=localhost VOLUME=3
+```
+> `HOST` is the host address, by default it is set to `localhost`, but it will only work for Linux machines;
+for Windows/MacOS, change it to a real IP address.
+> 
+> `VOLUME` is the number of volume servers to run, by default is set to `3`.
+
 ### Build from source
 To build and run master server from the source code:
 1. Requirements: **go, make & nginx**
@@ -24,7 +34,7 @@ $ PORT=3003 VOLUME=tmp/vol3 ./volume/setup.sh
 ```
 5. Run the master server binary:
 ```bash
-$ ./bin/master --db ./tmp/indexdb/ --port 3000 --volumes localhost:3001,localhost:3002,localhost:3003
+$ ./bin/master -db ./tmp/indexdb/ -p 3000 -volumes localhost:3001,localhost:3002,localhost:3003
 ```
 
 ## 📘 Usage
@@ -54,14 +64,14 @@ $ curl -L "localhost:3000?list&start=/we&limit=100"
 ### Rebalance volumes
 Change the amount of volume servers:
 ```bash
-$ ./bin/master --cmd rebalance --db ./tmp/indexdb/ --volumes localhost:3001,localhost:3002
+$ ./bin/master -cmd rebalance -db ./tmp/indexdb/ -volumes localhost:3001,localhost:3002
 ```
 > Before rebalancing, make sure the master server is down, as LevelDB can only be accessed by one process.
 
 ### Rebuild the index
 Regenerate the LevelDB:
 ```bash
-$ ./bin/master --cmd rebuild --db ./tmp/indexdb-alt/ --volumes localhost:3001,localhost:3002,localhost:3003
+$ ./bin/master -cmd rebuild -db ./tmp/indexdb-alt/ -volumes localhost:3001,localhost:3002,localhost:3003
 ```
 
 ## 🕜 Performance
