@@ -4,6 +4,11 @@
 
 Distributed key-value store written in Go.
 
+## ✅ Features
+- [x] Simple API for managing data in key-value format
+- [x] Rebalancing data across volume servers
+- [x] Index build based on volumes data
+
 ## 🛠️ Installation
 ### Run with Docker
 To run tinykv with Docker on a single host:

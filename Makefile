@@ -108,7 +108,6 @@ docker-bench:
 	@docker exec $(DOCKER_IMAGE_DEV) make bench
 
 docker-up-volume:
-	@docker compose -p tinykv -f docker/docker-compose.yml stop volume
 	@docker compose -p tinykv -f docker/docker-compose.yml up -d --scale volume=$(VOLUME) volume
 
 docker-up-master:
