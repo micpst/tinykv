@@ -1,13 +1,13 @@
-# Build:
+# Build config:
 BINARY_DIR=bin
 BINARY_NAME=master
 BINARY_PATH=$(BINARY_DIR)/$(BINARY_NAME)
 RELEASE_NAME=tinykv
 
-# Test:
+# Test config:
 COVERAGE_PROFILE=cover.out
 
-# Docker dev:
+# Docker config:
 DOCKER_IMAGE=tinykv-master
 DOCKER_IMAGE_DEV=$(DOCKER_IMAGE)-dev
 DOCKER_IMAGE_WATCH=$(DOCKER_IMAGE)-watch
@@ -20,7 +20,7 @@ WATCH_VOL1_PATH=tmp/vol1
 WATCH_VOL2_PATH=tmp/vol2
 WATCH_VOL3_PATH=tmp/vol3
 
-# Docker config:
+# Docker setup config:
 HOST=localhost
 REPLICAS=3
 VOLUME=3
@@ -50,19 +50,12 @@ watch:
 	@docker run -it --rm \
 		-w /go/src/$(PACKAGE_NAME) \
 		-v $(shell pwd):/go/src/$(PACKAGE_NAME) \
-		-p $(WATCH_MASTER_PORT):$(WATCH_MASTER_PORT) \
-		-p $(WATCH_VOL1_PORT):$(WATCH_VOL1_PORT) \
-		-p $(WATCH_VOL2_PORT):$(WATCH_VOL2_PORT) \
-		-p $(WATCH_VOL3_PORT):$(WATCH_VOL3_PORT) \
+		-p $(WATCH_MASTER_PORT):3000 \
+		-p $(WATCH_VOL1_PORT):3001 \
+		-p $(WATCH_VOL2_PORT):3002 \
+		-p $(WATCH_VOL3_PORT):3003 \
 		--name $(DOCKER_IMAGE_WATCH) \
-		$(DOCKER_IMAGE_WATCH) \
-		--build.cmd "go build -race -buildvcs=false -o $(BINARY_PATH) ./cmd/master && \
-					 ./volume/kill_all.sh && \
-					 rm -r tmp || true && \
-					 PORT=$(WATCH_VOL1_PORT) VOLUME=$(WATCH_VOL1_PATH) ./volume/setup.sh && \
-					 PORT=$(WATCH_VOL2_PORT) VOLUME=$(WATCH_VOL2_PATH) ./volume/setup.sh && \
-					 PORT=$(WATCH_VOL3_PORT) VOLUME=$(WATCH_VOL3_PATH) ./volume/setup.sh" \
-		--build.bin "./$(BINARY_PATH) -db $(WATCH_MASTER_INDEX_PATH) -p $(WATCH_MASTER_PORT) -volumes localhost:$(WATCH_VOL1_PORT),localhost:$(WATCH_VOL2_PORT),localhost:$(WATCH_VOL3_PORT)"
+		$(DOCKER_IMAGE_WATCH)
 
 # Test:
 test:
@@ -76,11 +69,11 @@ coverage:
 bench:
 	@go test -bench=. -run=^a -benchtime=5x ./...
 
-# Format
+# Format:
 format:
-	@gofmt -s -w .
+	@go fmt ./...
 
-# Lint
+# Lint:
 lint:
 	@golangci-lint run
 

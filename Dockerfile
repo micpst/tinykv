@@ -20,7 +20,7 @@ COPY --from=base /go/pkg/mod /go/pkg/mod
 ENTRYPOINT ["tail", "-f", "/dev/null"]
 
 # --- Development watch image ---
-FROM cosmtrek/air AS watch
+FROM cosmtrek/air:v1.51.0 AS watch
 
 RUN apt update && \
     apt install -y nginx

@@ -1,8 +1,2 @@
 run:
   timeout: 3m
-  skip-dirs:
-    - .github
-    - .husky
-    - bin
-    - tmp
-    - volume

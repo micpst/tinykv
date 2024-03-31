@@ -1,0 +1,23 @@
+[build]
+  args_bin = [
+    "-db",
+    "tmp/indexdb",
+    "-p",
+    "3000",
+    "-volumes",
+    "localhost:3001,localhost:3002,localhost:3003",
+  ]
+  bin = "./bin/master"
+  cmd = """
+    make build && \
+    ./volume/kill_all.sh && \
+    rm -r tmp || true && \
+    PORT=3001 VOLUME=tmp/vol1 ./volume/setup.sh && \
+    PORT=3002 VOLUME=tmp/vol2 ./volume/setup.sh && \
+    PORT=3003 VOLUME=tmp/vol3 ./volume/setup.sh
+  """
+  exclude_dir = [
+    "bin",
+    "docker",
+    "tmp",
+  ]
